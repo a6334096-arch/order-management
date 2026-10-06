@@ -137,12 +137,12 @@ def index():
 
     # 5. 每月營收
     monthly = conn.execute('''
-        SELECT substr(o.日期, 1, 7) AS 月份,
+       SELECT substr(o.訂單日期, 1, 7) AS 月份,
                COALESCE(SUM(oi.數量 * oi.單價), 0) AS 營收
         FROM orders o
         JOIN order_item oi USING(訂單編號)
         WHERE o.狀態 != '已取消'
-        GROUP BY substr(o.日期, 1, 7)
+       GROUP BY substr(o.訂單日期, 1, 7)
         ORDER BY 月份
     ''').fetchall()
 
