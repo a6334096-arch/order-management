@@ -107,6 +107,87 @@ def login():
 @app.route('/logout')
 def logout(): session.clear(); return redirect(url_for('login'))
 
+  @app.route('/')
+@login_required
+def index():
+    conn = db()
+
+    # 1. 累計營收（排除已取消）
+    total_revenue = conn.execute('''
+        SELECT COALESCE(SUM(oi.數量 * oi.單價), 0)
+        FROM orders o
+        JOIN order_item oi USING(訂單編號)
+        WHERE o.狀態 != '已取消'
+    ''').fetchone()[0]
+
+    # 2. 有效訂單數
+    valid_orders = conn.execute('''
+        SELECT COUNT(*)
+        FROM orders
+        WHERE 狀態 != '已取消'
+    ''').fetchone()[0]
+
+    # 3. 平均客單價
+    avg_order_value = total_revenue / valid_orders if valid_orders else 0
+
+    # 4. 客戶數
+    customer_count = conn.execute(
+        'SELECT COUNT(*) FROM customer'
+    ).fetchone()[0]
+
+    # 5. 每月營收
+    monthly = conn.execute('''
+        SELECT substr(o.日期, 1, 7) AS 月份,
+               COALESCE(SUM(oi.數量 * oi.單價), 0) AS 營收
+        FROM orders o
+        JOIN order_item oi USING(訂單編號)
+        WHERE o.狀態 != '已取消'
+        GROUP BY substr(o.日期, 1, 7)
+        ORDER BY 月份
+    ''').fetchall()
+
+    monthly_labels = [row['月份'] for row in monthly]
+    monthly_revenue = [row['營收'] for row in monthly]
+
+    # 6. 訂單狀態分布
+    status_data = conn.execute('''
+        SELECT 狀態, COUNT(*) AS 數量
+        FROM orders
+        GROUP BY 狀態
+        ORDER BY 數量 DESC
+    ''').fetchall()
+
+    status_labels = [row['狀態'] for row in status_data]
+    status_counts = [row['數量'] for row in status_data]
+
+    # 7. 熱銷商品 Top 5
+    top_products = conn.execute('''
+        SELECT p.名稱 AS 商品名稱,
+               SUM(oi.數量) AS 售出數量,
+               SUM(oi.數量 * oi.單價) AS 營收
+        FROM order_item oi
+        JOIN orders o USING(訂單編號)
+        JOIN product p USING(商品編號)
+        WHERE o.狀態 != '已取消'
+        GROUP BY p.商品編號, p.名稱
+        ORDER BY 售出數量 DESC
+        LIMIT 5
+    ''').fetchall()
+
+    # 8. 客戶消費排行 Top 5
+    top_customers = conn.execute('''
+        SELECT c.名稱 AS 客戶名稱,
+               COUNT(DISTINCT o.訂單編號) AS 訂單數,
+               SUM(oi.數量 * oi.單價) AS 消費金額
+        FROM customer c
+        JOIN orders o USING(客戶編號)
+        JOIN order_item oi USING(訂單編號)
+        WHERE o.狀態 != '已取消'
+        GROUP BY c.客戶編號, c.名稱
+        ORDER BY 消費金額 DESC
+        LIMIT 5
+    ''').fetchall()
+
     conn.close()
 
     return render_template(
