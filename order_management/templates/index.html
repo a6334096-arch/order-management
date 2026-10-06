@@ -1,1 +1,357 @@
-{% extends 'base.html' %}{% block content %}<h2 class="mb-4">管理儀表板</h2><div class="row g-3 mb-4">{% for key,label in [('customer','客戶'),('product','商品'),('orders','訂單')] %}<div class="col-md-4"><div class="card p-4"><div class="text-secondary">{{label}}總數</div><div class="display-5 fw-bold">{{counts[key]}}</div></div></div>{% endfor %}</div><div class="card p-4"><div class="d-flex justify-content-between"><h4>最近訂單</h4><a class="btn btn-primary" href="{{url_for('order_new')}}">＋ 新增訂單</a></div><div class="table-responsive"><table class="table mt-3"><tr><th>訂單</th><th>客戶</th><th>日期</th><th>狀態</th></tr>{% for r in recent %}<tr><td><a href="{{url_for('order_detail',id=r.訂單編號)}}">#{{r.訂單編號}}</a></td><td>{{r.客戶名稱}}</td><td>{{r.訂單日期}}</td><td>{{r.狀態}}</td></tr>{% endfor %}</table></div></div>{% endblock %}
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h2 class="mb-4">營運儀表板</h2>
+
+<!-- KPI -->
+<div class="row g-3 mb-4">
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted">累計營收</div>
+                <h3 class="mt-2">
+                    ${{ "{:,.0f}".format(total_revenue) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted">有效訂單數</div>
+                <h3 class="mt-2">
+                    {{ "{:,}".format(valid_orders) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted">平均客單價</div>
+                <h3 class="mt-2">
+                    ${{ "{:,.0f}".format(avg_order_value) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted">客戶數</div>
+                <h3 class="mt-2">
+                    {{ "{:,}".format(customer_count) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- 圖表 -->
+<div class="row g-3 mb-4">
+
+    <!-- 每月營收 -->
+    <div class="col-12 col-lg-8">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title">每月營收趨勢</h5>
+
+                <div style="height:320px;">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 訂單狀態 -->
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+
+                <h5 class="card-title">訂單狀態分布</h5>
+
+                <div style="height:320px;">
+                    <canvas id="statusChart"></canvas>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- 排行榜 -->
+<div class="row g-3">
+
+    <!-- 熱銷商品 -->
+    <div class="col-12 col-lg-6">
+
+        <div class="card shadow-sm h-100">
+
+            <div class="card-body">
+
+                <h5 class="card-title mb-3">
+                    熱銷商品 Top 5
+                </h5>
+
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle">
+
+                        <thead>
+                            <tr>
+                                <th>商品名稱</th>
+                                <th class="text-end">售出數量</th>
+                                <th class="text-end">營收</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                        {% for row in top_products %}
+
+                            <tr>
+                                <td>{{ row['商品名稱'] }}</td>
+
+                                <td class="text-end">
+                                    {{ "{:,}".format(row['售出數量']) }}
+                                </td>
+
+                                <td class="text-end">
+                                    ${{ "{:,.0f}".format(row['營收']) }}
+                                </td>
+                            </tr>
+
+                        {% else %}
+
+                            <tr>
+                                <td colspan="3"
+                                    class="text-center text-muted">
+                                    尚無資料
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- 客戶排行 -->
+    <div class="col-12 col-lg-6">
+
+        <div class="card shadow-sm h-100">
+
+            <div class="card-body">
+
+                <h5 class="card-title mb-3">
+                    客戶消費排行 Top 5
+                </h5>
+
+                <div class="table-responsive">
+
+                    <table class="table table-hover align-middle">
+
+                        <thead>
+
+                            <tr>
+                                <th>客戶名稱</th>
+                                <th class="text-end">訂單數</th>
+                                <th class="text-end">消費金額</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                        {% for row in top_customers %}
+
+                            <tr>
+
+                                <td>{{ row['客戶名稱'] }}</td>
+
+                                <td class="text-end">
+                                    {{ "{:,}".format(row['訂單數']) }}
+                                </td>
+
+                                <td class="text-end">
+                                    ${{ "{:,.0f}".format(row['消費金額']) }}
+                                </td>
+
+                            </tr>
+
+                        {% else %}
+
+                            <tr>
+                                <td colspan="3"
+                                    class="text-center text-muted">
+                                    尚無資料
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+/* 每月營收折線圖 */
+
+const revenueCtx =
+    document.getElementById('revenueChart');
+
+new Chart(revenueCtx, {
+
+    type: 'line',
+
+    data: {
+
+        labels: {{ monthly_labels | tojson }},
+
+        datasets: [{
+
+            label: '營收',
+
+            data: {{ monthly_revenue | tojson }},
+
+            borderWidth: 3,
+
+            tension: 0.3,
+
+            fill: false
+
+        }]
+
+    },
+
+    options: {
+
+        responsive: true,
+
+        maintainAspectRatio: false,
+
+        scales: {
+
+            y: {
+
+                beginAtZero: true,
+
+                ticks: {
+
+                    callback: function(value) {
+                        return '$' +
+                        Number(value).toLocaleString();
+                    }
+
+                }
+
+            }
+
+        },
+
+        plugins: {
+
+            tooltip: {
+
+                callbacks: {
+
+                    label: function(context) {
+
+                        return '營收：$' +
+                        Number(context.raw)
+                        .toLocaleString();
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+});
+
+
+/* 訂單狀態環圈圖 */
+
+const statusCtx =
+    document.getElementById('statusChart');
+
+new Chart(statusCtx, {
+
+    type: 'doughnut',
+
+    data: {
+
+        labels: {{ status_labels | tojson }},
+
+        datasets: [{
+
+            data: {{ status_counts | tojson }}
+
+        }]
+
+    },
+
+    options: {
+
+        responsive: true,
+
+        maintainAspectRatio: false,
+
+        cutout: '60%',
+
+        plugins: {
+
+            legend: {
+
+                position: 'bottom'
+
+            }
+
+        }
+
+    }
+
+});
+
+</script>
+
+{% endblock %}
