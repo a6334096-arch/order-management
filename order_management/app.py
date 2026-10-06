@@ -107,13 +107,23 @@ def login():
 @app.route('/logout')
 def logout(): session.clear(); return redirect(url_for('login'))
 
-@app.route('/')
-@login_required
-def index():
-    conn=db()
-    counts={x:conn.execute(f'SELECT COUNT(*) FROM {x}').fetchone()[0] for x in ['customer','product','orders']}
-    recent=conn.execute('''SELECT o.*,c.名稱 客戶名稱 FROM orders o JOIN customer c USING(客戶編號) ORDER BY 訂單日期 DESC,訂單編號 DESC LIMIT 5''').fetchall()
-    conn.close(); return render_template('index.html',counts=counts,recent=recent)
+    conn.close()
+
+    return render_template(
+        'index.html',
+        total_revenue=total_revenue,
+        valid_orders=valid_orders,
+        avg_order_value=avg_order_value,
+        customer_count=customer_count,
+        monthly_labels=monthly_labels,
+        monthly_revenue=monthly_revenue,
+        status_labels=status_labels,
+        status_counts=status_counts,
+        top_products=top_products,
+        top_customers=top_customers
+    )
+
+
 
 @app.route('/customers')
 @login_required
