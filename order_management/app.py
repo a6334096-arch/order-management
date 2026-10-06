@@ -107,7 +107,7 @@ def login():
 @app.route('/logout')
 def logout(): session.clear(); return redirect(url_for('login'))
 
-  @app.route('/')
+@app.route('/')
 @login_required
 def index():
     conn = db()
